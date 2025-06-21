@@ -1,11 +1,8 @@
 package com.example.attendence.auth
 
-// Firebase imports
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
-
-// Coroutines imports
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,8 +15,8 @@ data class User(
     val uid: String = "",
     val email: String = "",
     val name: String = "",
-    val role: String = "", // "student" or "instructor"
-    val studentId: String = "", // Only for students
+    val role: String = "",
+    val studentId: String = "",
     val department: String = ""
 )
 
@@ -40,7 +37,6 @@ class AuthManager {
     val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
 
     init {
-        // Check if user is already logged in
         auth.currentUser?.let { firebaseUser ->
             CoroutineScope(Dispatchers.IO).launch {
                 loadUserData(firebaseUser.uid)
@@ -48,7 +44,6 @@ class AuthManager {
         }
     }
 
-    // Register new user
     suspend fun registerUser(
         email: String,
         password: String,
@@ -59,13 +54,10 @@ class AuthManager {
     ): AuthResult {
         return try {
             _authState.value = AuthResult.Loading
-
-            // Create Firebase Auth user
             val result = auth.createUserWithEmailAndPassword(email, password).await()
             val firebaseUser = result.user
 
             if (firebaseUser != null) {
-                // Create user document in Firestore
                 val user = User(
                     uid = firebaseUser.uid,
                     email = email,
@@ -75,7 +67,6 @@ class AuthManager {
                     department = department
                 )
 
-                // Save user data to Firestore
                 firestore.collection("users")
                     .document(firebaseUser.uid)
                     .set(user)
@@ -95,11 +86,9 @@ class AuthManager {
         }
     }
 
-    // Login user
     suspend fun loginUser(email: String, password: String): AuthResult {
         return try {
             _authState.value = AuthResult.Loading
-
             val result = auth.signInWithEmailAndPassword(email, password).await()
             val firebaseUser = result.user
 
@@ -123,7 +112,6 @@ class AuthManager {
         }
     }
 
-    // Load user data from Firestore
     private suspend fun loadUserData(uid: String) {
         try {
             val document = firestore.collection("users").document(uid).get().await()
@@ -131,6 +119,7 @@ class AuthManager {
                 val user = document.toObject(User::class.java)
                 if (user != null) {
                     _currentUser.value = user
+                    _authState.value = AuthResult.Success // 🔥 fix: restore session state
                 } else {
                     _currentUser.value = null
                 }
@@ -142,24 +131,20 @@ class AuthManager {
         }
     }
 
-    // Logout user
     fun logout() {
         auth.signOut()
         _currentUser.value = null
         _authState.value = null
     }
 
-    // Check if user is logged in
     fun isUserLoggedIn(): Boolean {
         return auth.currentUser != null
     }
 
-    // Get current Firebase user
     fun getCurrentFirebaseUser(): FirebaseUser? {
         return auth.currentUser
     }
 
-    // Reset password
     suspend fun resetPassword(email: String): AuthResult {
         return try {
             _authState.value = AuthResult.Loading
@@ -173,7 +158,6 @@ class AuthManager {
         }
     }
 
-    // Update user profile
     suspend fun updateUserProfile(
         name: String,
         department: String,
@@ -193,7 +177,6 @@ class AuthManager {
                 .update(updates)
                 .await()
 
-            // Reload user data
             loadUserData(currentUid)
             AuthResult.Success
         } catch (e: Exception) {

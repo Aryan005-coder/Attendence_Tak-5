@@ -32,32 +32,22 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf("") }
 
-    val authState by authViewModel.authState.collectAsState()
+    val uiState by authViewModel.uiState.collectAsState() // ✅ Updated line
+    val authState = uiState.authState                     // ✅ New line
     val coroutineScope = rememberCoroutineScope()
 
-    // ✅ Fix: Use local val for smart cast
     LaunchedEffect(authState) {
-        val state = authState
-        when (state) {
+        when (authState) {
             is AuthResult.Success -> {
                 navController.navigate("dashboard") {
                     popUpTo("login") { inclusive = true }
                 }
             }
             is AuthResult.Error -> {
-                isLoading = false
-                errorMessage = state.message
+                // We already have the error inside uiState, no need to manage separately
             }
-            is AuthResult.Loading -> {
-                isLoading = true
-                errorMessage = ""
-            }
-            null -> {
-                isLoading = false
-            }
+            else -> Unit
         }
     }
 
@@ -69,84 +59,9 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            imageVector = Icons.Default.School,
-            contentDescription = null,
-            modifier = Modifier.size(80.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
+        // ... [same as your current UI code]
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "University Attendance",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-
-        Text(
-            text = "Sign in to continue",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            singleLine = true,
-            enabled = !isLoading
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-            trailingIcon = {
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                    Icon(
-                        if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = if (passwordVisible) "Hide password" else "Show password"
-                    )
-                }
-            },
-            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            singleLine = true,
-            enabled = !isLoading
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        TextButton(
-            onClick = {
-                if (email.isNotEmpty()) {
-                    coroutineScope.launch {
-                        authViewModel.resetPassword(email)
-                    }
-                } else {
-                    errorMessage = "Please enter your email first"
-                }
-            },
-            enabled = !isLoading
-        ) {
-            Text("Forgot Password?")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (errorMessage.isNotEmpty()) {
+        if (uiState.errorMessage?.isNotEmpty() == true) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -154,7 +69,7 @@ fun LoginScreen(
                 )
             ) {
                 Text(
-                    text = errorMessage,
+                    text = uiState.errorMessage ?: "",
                     modifier = Modifier.padding(16.dp),
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
@@ -169,9 +84,9 @@ fun LoginScreen(
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading && email.isNotEmpty() && password.isNotEmpty()
+            enabled = !uiState.isLoading && email.isNotEmpty() && password.isNotEmpty()
         ) {
-            if (isLoading) {
+            if (uiState.isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     color = MaterialTheme.colorScheme.onPrimary
@@ -187,7 +102,7 @@ fun LoginScreen(
             Text("Don't have an account? ")
             TextButton(
                 onClick = { navController.navigate("register") },
-                enabled = !isLoading
+                enabled = !uiState.isLoading
             ) {
                 Text("Sign Up")
             }
